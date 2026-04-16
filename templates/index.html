@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Lista de Tarefas</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 40px 16px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+      padding: 36px 32px;
+      width: 100%;
+      max-width: 560px;
+      height: fit-content;
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      color: #1a1a2e;
+      margin-bottom: 8px;
+    }
+
+    .subtitulo {
+      color: #888;
+      font-size: 0.9rem;
+      margin-bottom: 28px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      padding: 12px 16px;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      font-size: 1rem;
+      outline: none;
+      transition: border 0.2s;
+    }
+
+    input[type="text"]:focus { border-color: #6c63ff; }
+
+    button {
+      padding: 12px 20px;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    button:active { transform: scale(0.97); }
+
+    #btn-adicionar {
+      background: #6c63ff;
+      color: white;
+      font-weight: 600;
+    }
+
+    #btn-adicionar:hover { background: #574fd6; }
+
+    #btn-limpar {
+      width: 100%;
+      background: #fff0f0;
+      color: #e53935;
+      font-size: 0.9rem;
+      margin-top: 16px;
+    }
+
+    #btn-limpar:hover { background: #ffd6d6; }
+
+    .lista { list-style: none; }
+
+    .tarefa {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 12px;
+      border-radius: 10px;
+      margin-bottom: 8px;
+      background: #fafafa;
+      border: 1px solid #ececec;
+      transition: background 0.2s;
+    }
+
+    .tarefa:hover { background: #f3f0ff; }
+
+    .tarefa.concluida .descricao {
+      text-decoration: line-through;
+      color: #aaa;
+    }
+
+    .check {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      border: 2px solid #6c63ff;
+      cursor: pointer;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+    }
+
+    .tarefa.concluida .check {
+      background: #6c63ff;
+      border-color: #6c63ff;
+    }
+
+    .check::after {
+      content: '✓';
+      color: white;
+      font-size: 13px;
+      display: none;
+    }
+
+    .tarefa.concluida .check::after { display: block; }
+
+    .descricao {
+      flex: 1;
+      font-size: 1rem;
+      color: #333;
+    }
+
+    .data {
+      font-size: 0.75rem;
+      color: #bbb;
+      white-space: nowrap;
+    }
+
+    .btn-remover {
+      background: none;
+      color: #ccc;
+      font-size: 1.1rem;
+      padding: 4px 8px;
+      border-radius: 6px;
+    }
+
+    .btn-remover:hover { background: #ffe0e0; color: #e53935; }
+
+    .vazia {
+      text-align: center;
+      color: #bbb;
+      padding: 32px 0;
+      font-size: 0.95rem;
+    }
+
+    .stats {
+      font-size: 0.85rem;
+      color: #999;
+      margin-bottom: 16px;
+    }
+
+    .stats span { color: #6c63ff; font-weight: 600; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>📝 Lista de Tarefas</h1>
+  <p class="subtitulo">Organiza o teu dia de forma simples</p>
+
+  <div class="input-row">
+    <input type="text" id="input-tarefa" placeholder="Nova tarefa..." />
+    <button id="btn-adicionar">Adicionar</button>
+  </div>
+
+  <p class="stats">
+    <span id="total">0</span> tarefa(s) — <span id="pendentes">0</span> pendente(s)
+  </p>
+
+  <ul class="lista" id="lista"></ul>
+
+  <button id="btn-limpar">🗑 Remover concluídas</button>
+</div>
+
+<script>
+  const lista       = document.getElementById('lista');
+  const inputTarefa = document.getElementById('input-tarefa');
+  const totalEl     = document.getElementById('total');
+  const pendentesEl = document.getElementById('pendentes');
+
+  async function carregarTarefas() {
+    const res = await fetch('/api/tarefas');
+    const tarefas = await res.json();
+    renderizar(tarefas);
+  }
+
+  function renderizar(tarefas) {
+    totalEl.textContent    = tarefas.length;
+    pendentesEl.textContent = tarefas.filter(t => !t.concluida).length;
+
+    if (tarefas.length === 0) {
+      lista.innerHTML = '<p class="vazia">Nenhuma tarefa ainda. Adiciona uma! 🎯</p>';
+      return;
+    }
+
+    lista.innerHTML = tarefas.map(t => `
+      <li class="tarefa ${t.concluida ? 'concluida' : ''}" data-id="${t.id}">
+        <div class="check" onclick="toggleTarefa(${t.id})"></div>
+        <span class="descricao">${t.descricao}</span>
+        <span class="data">${t.criada_em}</span>
+        <button class="btn-remover" onclick="removerTarefa(${t.id})">✕</button>
+      </li>
+    `).join('');
+  }
+
+  async function adicionarTarefa() {
+    const descricao = inputTarefa.value.trim();
+    if (!descricao) return;
+
+    await fetch('/api/tarefas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ descricao })
+    });
+
+    inputTarefa.value = '';
+    carregarTarefas();
+  }
+
+  async function toggleTarefa(id) {
+    await fetch(`/api/tarefas/${id}`, { method: 'PATCH' });
+    carregarTarefas();
+  }
+
+  async function removerTarefa(id) {
+    await fetch(`/api/tarefas/${id}`, { method: 'DELETE' });
+    carregarTarefas();
+  }
+
+  document.getElementById('btn-adicionar').addEventListener('click', adicionarTarefa);
+  document.getElementById('btn-limpar').addEventListener('click', async () => {
+    await fetch('/api/tarefas/concluidas', { method: 'DELETE' });
+    carregarTarefas();
+  });
+
+  inputTarefa.addEventListener('keydown', e => {
+    if (e.key === 'Enter') adicionarTarefa();
+  });
+
+  carregarTarefas();
+</script>
+</body>
+</html>
